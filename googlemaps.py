@@ -11,6 +11,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver import ChromeOptions as Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.action_chains import ActionChains
@@ -43,8 +44,35 @@ class GoogleMapsScraper:
         self.driver.quit()
 
         return True
+    
+    def __get_logger(self):
+        """
+        Initializes and returns a logger instance for the GoogleMapsScraper class.
+    
+        This logger is configured to output log messages to the console using a stream handler.
+        The log level is set to DEBUG if `self.debug` is True, otherwise it uses INFO level.
+        It helps in monitoring the application's behavior, especially during development or debugging.
+        """
+        logger = logging.getLogger("GoogleMapsScraper")
+        logger.setLevel(logging.DEBUG if self.debug else logging.INFO)
+
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+
+        if not logger.handlers:
+            logger.addHandler(ch)
+
+        return logger
+
 
     def sort_by(self, url, ind):
+        """
+        Clicks the review sort button on a Google Maps page 
+        to select a sort option by index.
+        """
 
         self.driver.get(url)
         self.__click_on_cookie_agreement()
@@ -55,19 +83,26 @@ class GoogleMapsScraper:
         clicked = False
         tries = 0
         while not clicked and tries < MAX_RETRY:
+            menu_bt = None
             try:
-                menu_bt = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@data-value=\'Sort\']')))
-                menu_bt.click()
+                menu_bt = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@aria-label=\'Most relevant\']')))
+            except TimeoutException:
+                try:
+                    menu_bt = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@data-value=\'Sort\']')))
+                except TimeoutException:
+                    self.logger.warn('Failed to find Most relevant or Sort Button')
+            
+            if menu_bt:
+                try:
+                    menu_bt.click()
+                    clicked = True
+                    time.sleep(3)
+                except Exception as e:
+                    self.logger.warn(f'Failed to click the button: {e}')
+            tries += 1
 
-                clicked = True
-                time.sleep(3)
-            except Exception as e:
-                tries += 1
-                self.logger.warn('Failed to click sorting button')
-
-            # failed to open the dropdown
-            if tries == MAX_RETRY:
-                return -1
+        if not clicked:
+            return -1
 
         #  element of the list specified according to ind
         recent_rating_bt = self.driver.find_elements(By.XPATH, '//div[@role=\'menuitemradio\']')[ind]
@@ -148,8 +183,7 @@ class GoogleMapsScraper:
                 parsed_reviews.append(r)
 
                 # logging to std out
-                print(r)
-
+                # print(r)
         return parsed_reviews
 
 
@@ -171,51 +205,81 @@ class GoogleMapsScraper:
 
 
     def __parse(self, review):
-
         item = {}
 
         try:
-            # TODO: Subject to changes
+            # TODO: 
             id_review = review['data-review-id']
         except Exception as e:
             id_review = None
+            self.logger.warn('Failed to find and parse id_review')
 
         try:
-            # TODO: Subject to changes
+            # TODO: 
             username = review['aria-label']
         except Exception as e:
+            self.logger.warn('Failed to find and parse username')
             username = None
-
+        
         try:
-            # TODO: Subject to changes
+            # TODO:
             review_text = self.__filter_string(review.find('span', class_='wiI7pd').text)
         except Exception as e:
             review_text = None
+            self.logger.warn('Failed to find and parse review_text')
+
+        #Optional
+        # Retrieving additional information from reviews
+        try:
+            # TODO:
+            more_review_text = self.__filter_string(" ".join(review.find('div', attrs={'jslog':'127691'}).stripped_strings))
+        except Exception as e:
+            more_review_text = None
+            self.logger.warn('Failed to find and parse review_text')
+
+        #Retrieving additional information from reviews (type_vocation)
+        try:
+            # TODO:
+            type_vocation = self.__filter_string(" ".join(review.find('div', attrs={'jslog':'127691'}).stripped_strings))
+            if "Trip type" in type_vocation:
+                type_vocation = type_vocation.split('Trip type')[1].strip().split()[0]
+            else:
+                type_vocation = None
+        except Exception as e:
+            type_vocation = None
+            self.logger.warn('Failed to find and parse review_text')
 
         try:
-            # TODO: Subject to changes
-            rating = float(review.find('span', class_='kvMYJc')['aria-label'].split(' ')[0])
+            # TODO: 
+            rating = review.find('span', class_='fzvQIb').get_text()
         except Exception as e:
             rating = None
+            self.logger.warn('Failed to find and parse rating')
+            
 
         try:
             # TODO: Subject to changes
-            relative_date = review.find('span', class_='rsqaWe').text
+            relative_date = review.find('span', class_='xRkPPb').text
         except Exception as e:
             relative_date = None
+            self.logger.warn('Failed to find and parse relative_date')
 
         try:
             n_reviews = review.find('div', class_='RfnDt').text.split(' ')[3]
         except Exception as e:
             n_reviews = 0
+            self.logger.warn('Failed to find and parse n_reviews')
 
         try:
             user_url = review.find('button', class_='WEBjve')['data-href']
         except Exception as e:
             user_url = None
+            self.logger.warn('Failed to find and parse user_url')
 
         item['id_review'] = id_review
         item['caption'] = review_text
+        item['more_caption'] = more_review_text
+        item['type_vocation'] = type_vocation
 
         # depends on language, which depends on geolocation defined by Google Maps
         # custom mapping to transform into date should be implemented
@@ -328,18 +392,27 @@ class GoogleMapsScraper:
 
     # expand review description
     def __expand_reviews(self):
-        # use XPath to load complete reviews
-        # TODO: Subject to changes
         buttons = self.driver.find_elements(By.CSS_SELECTOR,'button.w8nwRe.kyuRq')
         for button in buttons:
             self.driver.execute_script("arguments[0].click();", button)
 
 
     def __scroll(self):
-        # TODO: Subject to changes
-        scrollable_div = self.driver.find_element(By.CSS_SELECTOR,'div.m6QErb.DxyBCb.kA9KIf.dS8AEf')
-        self.driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', scrollable_div)
-        #self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        # TODO:
+        scrollable_div = self.driver.find_element(By.CSS_SELECTOR, 'div.m6QErb.DxyBCb.kA9KIf.dS8AEf')
+        last_height = 0
+        for i in range(MAX_SCROLLS):
+            self.driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', scrollable_div)
+            time.sleep(1)
+
+            # check if the page can no longer be scrolled
+            new_height = self.driver.execute_script('return arguments[0].scrollTop', scrollable_div)
+            if new_height == last_height:
+                self.logger.info(f"Stopping scroll at iteration {i} — no more content to load.")
+                break
+            last_height = new_height
+
+
 
 
     def __get_logger(self):
@@ -367,7 +440,15 @@ class GoogleMapsScraper:
         options = Options()
 
         if not self.debug:
-            options.add_argument("--headless")
+            # options.add_argument("--headless")
+            options.add_argument('--headless=new')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-images')
+            options.add_argument('--disable-blink-features=AutomationControlled')
+
         else:
             options.add_argument("--window-size=1366,768")
 
