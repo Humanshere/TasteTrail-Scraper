@@ -247,7 +247,7 @@ class GoogleMapsScraper:
                 type_vocation = None
         except Exception as e:
             type_vocation = None
-            self.logger.warn('Failed to find and parse review_text')
+            self.logger.warn('Failed to find and parse Trip type')
 
         try:
             # TODO: 
