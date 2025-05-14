@@ -66,6 +66,23 @@ class GoogleMapsScraper:
             logger.addHandler(ch)
 
         return logger
+    
+    def open_reviews(self, url):
+        """
+        Clicks the review button on a Google Maps page to open the reviews section.
+        """
+        
+        self.driver.get(url)
+        self.__click_on_cookie_agreement()
+
+        try:
+            el = self.driver.find_element(By.XPATH, '//button[contains(@aria-label, "Reviews for")]')
+            # print("Element found:", el)
+            el.click()
+            time.sleep(2)
+        except NoSuchElementException:
+            # print("Element not found")
+            self.logger.warn('Failed to find Reviews button')
 
 
     def sort_by(self, url, ind):
@@ -74,8 +91,8 @@ class GoogleMapsScraper:
         to select a sort option by index.
         """
 
-        self.driver.get(url)
-        self.__click_on_cookie_agreement()
+        # self.driver.get(url)
+        # self.__click_on_cookie_agreement()
 
         wait = WebDriverWait(self.driver, MAX_WAIT)
 
@@ -162,6 +179,8 @@ class GoogleMapsScraper:
 
 
     def get_reviews(self, offset):
+        print('offset')
+        print(offset)
 
         # scroll to load reviews
         self.__scroll()
@@ -190,8 +209,22 @@ class GoogleMapsScraper:
 
     # need to use different url wrt reviews one to have all info
     def get_account(self, url):
-
+        print("Getting account data from url:", url)
         self.driver.get(url)
+        time.sleep(3)
+        # try:
+        #     el = self.driver.find_element(By.XPATH, '//button[contains(@aria-label, "Reviews for")]')
+        #     print("Element found:", el)
+        # except NoSuchElementException:
+        #     print("Element not found")
+
+        # print(self.driver.find_element(By.XPATH, '//button[contains(@aria-label, "Reviews for"])'))#.click()
+        # WebDriverWait(self.driver, 10).until(
+        #     EC.element_to_be_clickable(
+        #         (By.XPATH, '//button[contains(@aria-label, "Reviews for")]'))).click()
+
+        # recent_rating_bt = self.driver.find_elements(By.XPATH, '//div[@role=\'menuitemradio\']')[ind]
+
         self.__click_on_cookie_agreement()
 
         # ajax call also for this section
@@ -393,6 +426,7 @@ class GoogleMapsScraper:
     # expand review description
     def __expand_reviews(self):
         buttons = self.driver.find_elements(By.CSS_SELECTOR,'button.w8nwRe.kyuRq')
+        print("=========================", buttons, "=========================")
         for button in buttons:
             self.driver.execute_script("arguments[0].click();", button)
 

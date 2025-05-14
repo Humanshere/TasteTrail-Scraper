@@ -44,10 +44,16 @@ if __name__ == '__main__':
         with open(args.i, 'r') as urls_file:
             for url in urls_file:
                 if args.place:
+                    print("Getting place metadata")
                     # TODO: 
                     print(scraper.get_account(url))
                 else:
+                    print("Getting reviews from " + url)
                     # TODO:
+                    
+                    # open the reviews section
+                    scraper.open_reviews(url)
+
                     error = scraper.sort_by(url, ind[args.sort_by])
 
                     if error == 0:
@@ -58,6 +64,7 @@ if __name__ == '__main__':
                         #    scraper.more_reviews()
 
                         while n < args.N:
+                            print("Mengambil data review ke-" + str(n))
                             # logging to std out
                             print(colored('[Review ' + str(n) + ']', 'cyan'))
                             reviews = scraper.get_reviews(n)
