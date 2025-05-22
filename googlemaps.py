@@ -179,16 +179,17 @@ class GoogleMapsScraper:
 
 
     def get_reviews(self, offset):
-        print('offset')
-        print(offset)
 
         # scroll to load reviews
+        print("Scrolling to load reviews...")
         self.__scroll()
 
         # wait for other reviews to load (ajax)
+        print("Waiting for reviews to load(ajax)...")
         time.sleep(4)
 
         # expand review text
+        print("Expanding reviews...")
         self.__expand_reviews()
 
         # parse reviews
@@ -197,6 +198,8 @@ class GoogleMapsScraper:
         rblock = response.find_all('div', class_='jftiEf fontBodyMedium')
         parsed_reviews = []
         for index, review in enumerate(rblock):
+            print(f"Parsing review {index}...")
+            print(review)
             if index >= offset:
                 r = self.__parse(review)
                 parsed_reviews.append(r)
@@ -265,22 +268,13 @@ class GoogleMapsScraper:
         # Retrieving additional information from reviews
         try:
             # TODO:
-            more_review_text = self.__filter_string(" ".join(review.find('div', attrs={'jslog':'127691'}).stripped_strings))
+            html = review.find_all('div', class_='PBK6be')
+            more_review_text = []
+            for span in html:
+                more_review_text.append(span.get_text(separator=' '))
         except Exception as e:
             more_review_text = None
             self.logger.warn('Failed to find and parse review_text')
-
-        #Retrieving additional information from reviews (type_vocation)
-        try:
-            # TODO:
-            type_vocation = self.__filter_string(" ".join(review.find('div', attrs={'jslog':'127691'}).stripped_strings))
-            if "Trip type" in type_vocation:
-                type_vocation = type_vocation.split('Trip type')[1].strip().split()[0]
-            else:
-                type_vocation = None
-        except Exception as e:
-            type_vocation = None
-            self.logger.warn('Failed to find and parse Trip type')
 
         try:
             # TODO: 
@@ -312,7 +306,9 @@ class GoogleMapsScraper:
         item['id_review'] = id_review
         item['caption'] = review_text
         item['more_caption'] = more_review_text
-        item['type_vocation'] = type_vocation
+        item['type_trip'] = type_trip
+        item['Travel group'] = travel_group
+        item['Hotel highlights'] = hotel_highlights
 
         # depends on language, which depends on geolocation defined by Google Maps
         # custom mapping to transform into date should be implemented
@@ -425,26 +421,35 @@ class GoogleMapsScraper:
 
     # expand review description
     def __expand_reviews(self):
+        print("Expanding reviews descriptions function is running...")
         buttons = self.driver.find_elements(By.CSS_SELECTOR,'button.w8nwRe.kyuRq')
-        print("=========================", buttons, "=========================")
         for button in buttons:
+            print(f"Expanding review description for button: {button}")
             self.driver.execute_script("arguments[0].click();", button)
+        print("Expanding reviews descriptions finished.")
 
 
     def __scroll(self):
         # TODO:
+        print("Scrolling function is running...")
         scrollable_div = self.driver.find_element(By.CSS_SELECTOR, 'div.m6QErb.DxyBCb.kA9KIf.dS8AEf')
         last_height = 0
         for i in range(MAX_SCROLLS):
-            self.driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', scrollable_div)
-            time.sleep(1)
+            try:
+                print(f"Scroll iteration {i} — loaded more content.")
+                self.driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', scrollable_div)
+                time.sleep(1)
 
-            # check if the page can no longer be scrolled
-            new_height = self.driver.execute_script('return arguments[0].scrollTop', scrollable_div)
-            if new_height == last_height:
-                self.logger.info(f"Stopping scroll at iteration {i} — no more content to load.")
-                break
-            last_height = new_height
+                # check if the page can no longer be scrolled
+                new_height = self.driver.execute_script('return arguments[0].scrollTop', scrollable_div)
+                if new_height == last_height:
+                    self.logger.info(f"Stopping scroll at iteration {i} — no more content to load.")
+                    break
+                last_height = new_height
+            except Exception as e:
+                self.logger.error(f"Error during scrolling: {e}")
+        print("Scrolling finished.")
+
 
 
 

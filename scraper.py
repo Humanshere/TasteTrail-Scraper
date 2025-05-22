@@ -8,7 +8,7 @@ import time
 
 
 ind = {'most_relevant' : 0 , 'newest' : 1, 'highest_rating' : 2, 'lowest_rating' : 3 }
-HEADER = ['id_review', 'caption', 'more_caption', 'type_vocation', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user']
+HEADER = ['id_review', 'caption', 'more_caption', 'type_vocation', 'Travel group', 'Hotel highlights', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user']
 HEADER_W_SOURCE = ['id_review', 'caption', 'more_caption', 'type_vocation', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user', 'url_source']
 
 def csv_writer(source_field, ind_sort_by, outpath):
