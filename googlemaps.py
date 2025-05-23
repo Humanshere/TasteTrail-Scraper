@@ -24,7 +24,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 GM_WEBPAGE = 'https://www.google.com/maps/'
 MAX_WAIT = 10
 MAX_RETRY = 5
-MAX_SCROLLS = 40
+MAX_SCROLLS = 100
 
 class GoogleMapsScraper:
 
@@ -179,7 +179,7 @@ class GoogleMapsScraper:
 
 
     def get_reviews(self, offset):
-
+        print(f"offset: {offset}")
         # scroll to load reviews
         print("Scrolling to load reviews...")
         self.__scroll()
@@ -199,8 +199,11 @@ class GoogleMapsScraper:
         parsed_reviews = []
         for index, review in enumerate(rblock):
             print(f"Parsing review {index}...")
-            print(review)
+            # print(review)
+            
+            # Dont parse all reviews, just the ones after offset
             if index >= offset:
+                print(f"{index} >= {offset}")
                 r = self.__parse(review)
                 parsed_reviews.append(r)
 
@@ -306,9 +309,6 @@ class GoogleMapsScraper:
         item['id_review'] = id_review
         item['caption'] = review_text
         item['more_caption'] = more_review_text
-        item['type_trip'] = type_trip
-        item['Travel group'] = travel_group
-        item['Hotel highlights'] = hotel_highlights
 
         # depends on language, which depends on geolocation defined by Google Maps
         # custom mapping to transform into date should be implemented
@@ -424,7 +424,7 @@ class GoogleMapsScraper:
         print("Expanding reviews descriptions function is running...")
         buttons = self.driver.find_elements(By.CSS_SELECTOR,'button.w8nwRe.kyuRq')
         for button in buttons:
-            print(f"Expanding review description for button: {button}")
+            # print(f"Expanding review description for button: {button}")
             self.driver.execute_script("arguments[0].click();", button)
         print("Expanding reviews descriptions finished.")
 
@@ -443,7 +443,7 @@ class GoogleMapsScraper:
                 # check if the page can no longer be scrolled
                 new_height = self.driver.execute_script('return arguments[0].scrollTop', scrollable_div)
                 if new_height == last_height:
-                    self.logger.info(f"Stopping scroll at iteration {i} — no more content to load.")
+                    print(f"Stopping scroll at iteration {i} — no more content to load.")
                     break
                 last_height = new_height
             except Exception as e:
