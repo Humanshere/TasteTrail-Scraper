@@ -5,6 +5,7 @@ import re
 import time
 import traceback
 from datetime import datetime
+from random import uniform, choice
 
 import numpy as np
 import pandas as pd
@@ -24,7 +25,21 @@ from webdriver_manager.chrome import ChromeDriverManager
 GM_WEBPAGE = 'https://www.google.com/maps/'
 MAX_WAIT = 10
 MAX_RETRY = 5
-MAX_SCROLLS = 100
+MAX_SCROLLS = 5
+
+# Anti-bot detection settings
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+]
+
+# Randomized delay ranges (in seconds)
+DELAY_RANGE_SCROLL = (0.5, 1.5)
+DELAY_RANGE_CLICK = (0.8, 2.0)
+DELAY_RANGE_LOAD = (3.0, 6.0)
 
 class GoogleMapsScraper:
 
@@ -44,6 +59,24 @@ class GoogleMapsScraper:
         self.driver.quit()
 
         return True
+    
+    # Helper methods for anti-bot detection
+    def _smart_delay(self, min_delay=0.5, max_delay=2.0):
+        """Add randomized delay to appear human-like"""
+        delay = uniform(min_delay, max_delay)
+        time.sleep(delay)
+    
+    def _human_scroll(self, scrollable_element, pause_between=0.3):
+        """Scroll in a human-like manner with pauses"""
+        self._smart_delay(0.5, 1.0)
+        self.driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', scrollable_element)
+        self._smart_delay(pause_between, pause_between + 0.5)
+    
+    def _human_click(self, element):
+        """Click element in a human-like manner"""
+        self._smart_delay(0.8, 1.5)
+        element.click()
+        self._smart_delay(0.5, 1.0)
     
     def __get_logger(self):
         """
@@ -73,13 +106,13 @@ class GoogleMapsScraper:
         """
         
         self.driver.get(url)
+        self._smart_delay(1.0, 2.0)  # Wait for page to load
         self.__click_on_cookie_agreement()
 
         try:
             el = self.driver.find_element(By.XPATH, '//button[contains(@aria-label, "Reviews for")]')
             # print("Element found:", el)
-            el.click()
-            time.sleep(2)
+            self._human_click(el)
         except NoSuchElementException:
             # print("Element not found")
             self.logger.warn('Failed to find Reviews button')
@@ -111,9 +144,8 @@ class GoogleMapsScraper:
             
             if menu_bt:
                 try:
-                    menu_bt.click()
+                    self._human_click(menu_bt)
                     clicked = True
-                    time.sleep(3)
                 except Exception as e:
                     self.logger.warn(f'Failed to click the button: {e}')
             tries += 1
@@ -123,10 +155,10 @@ class GoogleMapsScraper:
 
         #  element of the list specified according to ind
         recent_rating_bt = self.driver.find_elements(By.XPATH, '//div[@role=\'menuitemradio\']')[ind]
-        recent_rating_bt.click()
+        self._human_click(recent_rating_bt)
 
         # wait to load review (ajax call)
-        time.sleep(5)
+        self._smart_delay(3.0, 5.0)
 
         return 0
 
@@ -186,11 +218,11 @@ class GoogleMapsScraper:
 
         # wait for other reviews to load (ajax)
         print("Waiting for reviews to load(ajax)...")
-        time.sleep(4)
+        self._smart_delay(2.0, 4.0)
 
-        # expand review text
-        print("Expanding reviews...")
-        self.__expand_reviews()
+        # # expand review text
+        # print("Expanding reviews...")
+        # self.__expand_reviews()
 
         # parse reviews
         response = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -217,7 +249,7 @@ class GoogleMapsScraper:
     def get_account(self, url):
         print("Getting account data from url:", url)
         self.driver.get(url)
-        time.sleep(3)
+        self._smart_delay(2.0, 3.5)
         # try:
         #     el = self.driver.find_element(By.XPATH, '//button[contains(@aria-label, "Reviews for")]')
         #     print("Element found:", el)
@@ -234,7 +266,7 @@ class GoogleMapsScraper:
         self.__click_on_cookie_agreement()
 
         # ajax call also for this section
-        time.sleep(2)
+        self._smart_delay(1.5, 3.0)
 
         resp = BeautifulSoup(self.driver.page_source, 'html.parser')
 
@@ -423,9 +455,14 @@ class GoogleMapsScraper:
     def __expand_reviews(self):
         print("Expanding reviews descriptions function is running...")
         buttons = self.driver.find_elements(By.CSS_SELECTOR,'button.w8nwRe.kyuRq')
-        for button in buttons:
-            # print(f"Expanding review description for button: {button}")
-            self.driver.execute_script("arguments[0].click();", button)
+        for i, button in enumerate(buttons):
+            try:
+                # print(f"Expanding review description for button: {button}")
+                self.driver.execute_script("arguments[0].click();", button)
+                # Add small delay between clicks to appear human
+                self._smart_delay(0.2, 0.5)
+            except Exception as e:
+                self.logger.warn(f"Failed to expand review {i}: {e}")
         print("Expanding reviews descriptions finished.")
 
 
@@ -437,8 +474,7 @@ class GoogleMapsScraper:
         for i in range(MAX_SCROLLS):
             try:
                 print(f"Scroll iteration {i} — loaded more content.")
-                self.driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', scrollable_div)
-                time.sleep(1)
+                self._human_scroll(scrollable_div, pause_between=0.5)
 
                 # check if the page can no longer be scrolled
                 new_height = self.driver.execute_script('return arguments[0].scrollTop', scrollable_div)
@@ -478,6 +514,9 @@ class GoogleMapsScraper:
     def __get_driver(self, debug=False):
         options = Options()
 
+        # Add random user agent to avoid detection
+        options.add_argument(f'user-agent={choice(USER_AGENTS)}')
+
         if not self.debug:
             # options.add_argument("--headless")
             options.add_argument('--headless=new')
@@ -487,6 +526,13 @@ class GoogleMapsScraper:
             options.add_argument('--disable-extensions')
             options.add_argument('--disable-images')
             options.add_argument('--disable-blink-features=AutomationControlled')
+            # Additional stealth options
+            options.add_argument('--disable-web-resources')
+            options.add_argument('--disable-client-side-phishing-detection')
+            options.add_argument('--disable-default-apps')
+            options.add_experimental_option('excludeSwitches', ['enable-automation'])
+            options.add_experimental_option('useAutomationExtension', False)
+            options.add_argument('--disable-plugins-power-saving-mode')
 
         else:
             options.add_argument("--window-size=1366,768")
@@ -494,7 +540,27 @@ class GoogleMapsScraper:
         options.add_argument("--disable-notifications")
         #options.add_argument("--lang=en-GB")
         options.add_argument("--accept-lang=en-GB")
+        
+        # Disable images to speed up loading
+        prefs = {"profile.managed_default_content_settings.images": 2}
+        options.add_experimental_option("prefs", prefs)
+        
         input_driver = webdriver.Chrome(service=Service(), options=options)
+        
+        # Add stealth JavaScript injection
+        input_driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+            'source': '''
+            Object.defineProperty(navigator, 'webdriver', {
+              get: () => false,
+            });
+            Object.defineProperty(navigator, 'plugins', {
+              get: () => [1, 2, 3, 4, 5],
+            });
+            Object.defineProperty(navigator, 'languages', {
+              get: () => ['en-US', 'en'],
+            });
+            '''
+        })
 
          # click on google agree button so we can continue (not needed anymore)
          # EC.element_to_be_clickable((By.XPATH, '//span[contains(text(), "I agree")]')))

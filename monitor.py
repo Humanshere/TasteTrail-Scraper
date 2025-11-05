@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
 from pymongo import MongoClient
 from googlemaps import GoogleMapsScraper
 from datetime import datetime, timedelta
@@ -37,28 +38,26 @@ class Monitor:
         with GoogleMapsScraper() as scraper:
             for url in self.urls:
                 try:
-                    error = scraper.sort_by_date(url)
-                    if error == 0:
-                        stop = False
-                        offset = 0
-                        n_new_reviews = 0
-                        while not stop:
-                            rlist = scraper.get_reviews(offset)
-                            for r in rlist:
-                                # calculate review date and compare to input min_date_review
-                                r['timestamp'] = self.__parse_relative_date(r['relative_date'])
-                                stop = self.__stop(r, collection)
-                                if not stop:
-                                    collection.insert_one(r)
-                                    n_new_reviews += 1
-                                else:
-                                    break
-                            offset += len(rlist)
+                    # Open reviews and scrape using Google Maps' default ordering
+                    scraper.open_reviews(url)
+                    stop = False
+                    offset = 0
+                    n_new_reviews = 0
+                    while not stop:
+                        rlist = scraper.get_reviews(offset)
+                        for r in rlist:
+                            # calculate review date and compare to input min_date_review
+                            r['timestamp'] = self.__parse_relative_date(r['relative_date'])
+                            stop = self.__stop(r, collection)
+                            if not stop:
+                                collection.insert_one(r)
+                                n_new_reviews += 1
+                            else:
+                                break
+                        offset += len(rlist)
 
-                        # log total number
-                        self.logger.info('{} : {} new reviews'.format(url, n_new_reviews))
-                    else:
-                        self.logger.warning('Sorting reviews failed for {}'.format(url))
+                    # log total number
+                    self.logger.info('{} : {} new reviews'.format(url, n_new_reviews))
 
                 except Exception as e:
                     exc_type, exc_obj, exc_tb = sys.exc_info()

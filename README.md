@@ -29,6 +29,7 @@ Additionally, other parameters can be provided:
 - `--debug`: boolean value that allows to run the browser using the graphical interface (default: false)
 - `--source`: boolean value that allows to store source URL as additional field in CSV (default: false)
 - `--sort_by`: string value among most_relevant, newest, highest_rating or lowest_rating (default: newest), developed by @quaesito and that allows to change sorting behavior of reviews
+ - Sorting is fixed: scraper always uses Google Maps' default ordering (no `--sort_by` option)
 
 For a basic description of logic and approach about this software development, have a look at the [Medium post](https://medium.com/data-science/scraping-google-maps-reviews-in-python-2b153c655fc2)
 
